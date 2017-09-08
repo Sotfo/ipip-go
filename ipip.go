@@ -12,7 +12,7 @@ type Datx struct {
 	data   []byte
 	index  []byte
 	flag   []uint32
-	offset uint
+	offset uint32
 }
 
 type IPIP struct {
@@ -29,21 +29,6 @@ type IPIP struct {
 	PC string // International phone code       // 国际电话代码        （每日版本提供）
 	CC string // Country code                   // 国家二位代码        （每日版本提供）
 	WC string // World continent                // 世界大洲代码        （每日版本提供）
-}
-
-func b2il(b []byte) uint {
-	addr := uint(b[0]) & 0xFF
-	addr |= (uint(b[1]) << 8) & 0xFF00
-	addr |= (uint(b[2]) << 16) & 0xFF0000
-	addr |= (uint(b[3]) << 24) & 0xFF000000
-	return addr
-}
-func b2iu(b []byte) uint {
-	addr := uint(b[3]) & 0xFF
-	addr |= (uint(b[2]) << 8) & 0xFF00
-	addr |= (uint(b[1]) << 16) & 0xFF0000
-	addr |= (uint(b[0]) << 24) & 0xFF000000
-	return addr
 }
 
 func ip2long(ipstr string) (uint32, []byte, error) {
@@ -65,7 +50,7 @@ func Init(ipfile string) (ipip *Datx, err error) {
 		return
 	}
 
-	indexlenth := b2iu(ipdata[:4])
+	indexlenth := binary.BigEndian.Uint32(ipdata[:4])
 	ipip.data = ipdata
 	ipip.index = ipdata[4 : indexlenth+4]
 	ipip.flag = make([]uint32, 65536)
@@ -85,18 +70,18 @@ func (ipip *Datx) Find(ip string) (*IPIP, error) {
 	if err != nil {
 		return nil, err
 	}
-	ipPrefix := uint(ips[0])*256 + uint(ips[1])
-	start := uint(ipip.flag[ipPrefix])
+	ipPrefix := uint32(ips[0])*256 + uint32(ips[1])
+	start := ipip.flag[ipPrefix]
 	maxCompLen := ipip.offset - 262144 - 4
 	var (
-		indexOffset uint = 0
-		indexLength uint = 0
+		indexOffset uint32 = 0
+		indexLength uint32 = 0
 	)
 
 	for start := start*9 + 262144; start < maxCompLen; start += 9 {
 		if binary.BigEndian.Uint32(ipip.index[start:start+4]) >= ipLong {
-			indexOffset = b2il(ipip.index[start+4:start+8]) & 0x00FFFFFF
-			indexLength = uint((ipip.index[start+7] << 8) + ipip.index[start+8])
+			indexOffset = binary.LittleEndian.Uint32(ipip.index[start+4 : start+8])
+			indexLength = uint32((ipip.index[start+7] << 8) + ipip.index[start+8])
 			break
 		}
 	}
